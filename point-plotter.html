@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Point Plotter</title>
+<style>
+  :root{
+    --bg:#1e1f24;
+    --panel:#26282f;
+    --panel2:#2d2f38;
+    --border:#3a3d47;
+    --text:#e6e7ea;
+    --text-dim:#9a9ca6;
+    --accent:#4f8cff;
+    --accent2:#38c172;
+    --danger:#e05656;
+    --grid:#33353d;
+    --grid-major:#454850;
+    --axis-x:#e05656;
+    --axis-y:#38c172;
+    --axis-z:#4f8cff;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;padding:0;height:100%;
+    background:var(--bg);color:var(--text);
+    font-family:Segoe UI,Arial,sans-serif;font-size:13px;
+    overflow:hidden;
+  }
+  #app{
+    display:flex;height:100vh;width:100vw;
+  }
+  #left{
+    flex:1 1 60%;
+    display:flex;flex-direction:column;
+    min-width:0;
+    border-right:1px solid var(--border);
+  }
+  #right{
+    flex:0 0 400px;
+    max-width:400px;
+    display:flex;flex-direction:column;
+    overflow-y:auto;
+    background:var(--panel);
+  }
+  .toolbar{
+    display:flex;gap:6px;padding:8px;background:var(--panel);
+    border-bottom:1px solid var(--border);flex-wrap:wrap;align-items:center;
+  }
+  .toolbar .sep{width:1px;background:var(--border);align-self:stretch;margin:0 4px;}
+  button{
+    background:var(--panel2);color:var(--text);border:1px solid var(--border);
+    padding:6px 10px;border-radius:4px;cursor:pointer;font-size:12px;
+  }
+  button:hover{background:#383b46;}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+  button.primary:hover{background:#3d7ae0;}
+  button.danger{background:var(--danger);border-color:var(--danger);color:#fff;}
+  button.small{padding:3px 7px;font-size:11px;}
+  button:disabled{opacity:0.4;cursor:default;}
+  label{color:var(--text-dim);font-size:11px;}
+  input[type=text], input[type=number]{
+    background:var(--panel2);color:var(--text);border:1px solid var(--border);
+    border-radius:4px;padding:5px 6px;font-size:12px;width:100%;
+  }
+  input[type=checkbox]{accent-color:var(--accent);}
+  #canvasWrap{
+    flex:1 1 auto;position:relative;overflow:hidden;background:#191a1e;
+  }
+  canvas{display:block;position:absolute;top:0;left:0;cursor:crosshair;}
+  #cubeFloating{
+    position:fixed;left:16px;bottom:16px;z-index:80;
+    width:208px;
+    background:rgba(38,40,47,0.97);
+    border:1px solid var(--border);
+    border-radius:8px;
+    box-shadow:0 6px 24px rgba(0,0,0,0.45);
+    padding:10px 14px 14px;
+  }
+  #cubeFloating h3{margin:0 0 4px;font-size:11px;color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:.5px;text-align:center;}
+  #cubeWrap{
+    display:flex;flex-direction:column;align-items:center;
+  }
+  #cubeStageOuter{
+    width:100%;height:130px;
+    display:flex;align-items:center;justify-content:center;
+    overflow:visible;
+  }
+  #cubeStage{
+    width:80px;height:80px;
+    perspective:420px;
+    flex:0 0 auto;
+    overflow:visible;
+  }
+  #cube{
+    width:100%;height:100%;position:relative;
+    transform-style:preserve-3d;
+    transform:rotateX(-25deg) rotateY(35deg);
+    cursor:grab;
+  }
+  #cube.dragging{cursor:grabbing;}
+  .face{
+    position:absolute;width:80px;height:80px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:13px;font-weight:700;
+    border:1px solid rgba(0,0,0,0.4);
+    opacity:0.88;
+    user-select:none;
+  }
+  .face.selected{outline:3px solid #fff;opacity:1;z-index:5;}
+  .face-x{background:linear-gradient(145deg,#e05656,#b53f3f);color:#fff;}
+  .face-y{background:linear-gradient(145deg,#38c172,#289156);color:#fff;}
+  .face-z{background:linear-gradient(145deg,#4f8cff,#2f66d0);color:#fff;}
+  .f-posx{transform:rotateY(90deg) translateZ(40px);}
+  .f-negx{transform:rotateY(-90deg) translateZ(40px);}
+  .f-posy{transform:rotateX(90deg) translateZ(40px);}
+  .f-negy{transform:rotateX(-90deg) translateZ(40px);}
+  .f-posz{transform:translateZ(40px);}
+  .f-negz{transform:rotateY(180deg) translateZ(40px);}
+  #cubeInfo{width:100%;}
+  #faceLabel{font-size:12px;font-weight:600;margin-bottom:5px;text-align:center;}
+  #mapInfo{font-size:10.5px;color:var(--text-dim);line-height:1.55;}
+  #mapInfo .ax{font-weight:700;}
+  .ax-x{color:var(--axis-x);}
+  .ax-y{color:var(--axis-y);}
+  .ax-z{color:var(--axis-z);}
+  #leteRow{margin-top:9px;padding-top:9px;border-top:1px solid var(--border);}
+  #leteRow .lbl{font-size:10.5px;color:var(--text-dim);margin-bottom:5px;}
+  #btnFlipLE{width:100%;font-size:11px;padding:5px 6px;}
+  .section{
+    padding:12px;border-bottom:1px solid var(--border);
+  }
+  .section h3{margin:0 0 8px;font-size:12px;color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:.5px;}
+  .section.collapsed{padding-bottom:12px;}
+  .section.collapsed h3{margin-bottom:0;}
+  .section.collapsed > *:not(h3){display:none;}
+  .sectionToggle{
+    display:inline-block;width:14px;cursor:pointer;user-select:none;
+    color:var(--text-dim);transition:transform 0.15s;
+  }
+  .section.collapsed .sectionToggle{transform:rotate(-90deg);}
+  .row{display:flex;gap:8px;margin-bottom:8px;align-items:center;}
+  .row > div{flex:1;}
+  .row.tight{margin-bottom:4px;}
+  #tableSection{flex:1 1 auto;display:flex;flex-direction:column;min-height:200px;}
+  #tableWrap{flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:4px;margin-top:6px;}
+  table{width:100%;border-collapse:collapse;font-size:12px;}
+  thead th{
+    position:sticky;top:0;background:var(--panel2);padding:5px 6px;text-align:left;
+    border-bottom:1px solid var(--border);color:var(--text-dim);font-weight:600;
+  }
+  tbody td{padding:2px 4px;border-bottom:1px solid #2f313a;}
+  tbody tr:hover{background:#2f313c;}
+  tbody tr.selected{background:#33415c;}
+  tbody input{
+    width:100%;background:transparent;border:1px solid transparent;color:var(--text);
+    padding:3px 4px;border-radius:3px;font-size:12px;
+  }
+  tbody input:focus{background:var(--panel2);border-color:var(--accent);outline:none;}
+  .idxcell{color:var(--text-dim);width:28px;text-align:center;}
+  .delcell{width:26px;text-align:center;}
+  .delbtn{background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:0;}
+  .delbtn:hover{color:#ff7a7a;}
+  #statusbar{
+    padding:5px 10px;font-size:11px;color:var(--text-dim);
+    background:var(--panel);border-top:1px solid var(--border);
+    display:flex;justify-content:space-between;
+  }
+  .hint{font-size:10px;color:var(--text-dim);margin-top:4px;}
+  #importInput{display:none;}
+  .badge{
+    display:inline-block;background:var(--panel2);border:1px solid var(--border);
+    border-radius:3px;padding:1px 5px;font-size:10px;color:var(--text-dim);
+  }
+  #lenPreview{font-size:11px;color:var(--text-dim);margin-top:4px;line-height:1.5;}
+  #lenPreview b{color:var(--text);}
+  ::-webkit-scrollbar{width:9px;height:9px;}
+  ::-webkit-scrollbar-thumb{background:#454850;border-radius:5px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  #confirmOverlay{
+    position:fixed;inset:0;background:rgba(0,0,0,0.55);
+    display:none;align-items:center;justify-content:center;z-index:200;
+  }
+  #confirmOverlay.open{display:flex;}
+  #confirmBox{
+    background:var(--panel2);border:1px solid var(--border);border-radius:8px;
+    padding:18px 20px;max-width:320px;box-shadow:0 10px 30px rgba(0,0,0,0.5);
+  }
+  #confirmMsg{font-size:13px;line-height:1.5;margin-bottom:16px;}
+  #confirmBox .btnrow{display:flex;gap:8px;justify-content:flex-end;}
+  #confirmBox button{min-width:70px;}
+  #exportOverlay{
+    position:fixed;inset:0;background:rgba(0,0,0,0.55);
+    display:none;align-items:center;justify-content:center;z-index:200;
+    padding:16px;
+  }
+  #exportOverlay.open{display:flex;}
+  #exportBox{
+    background:var(--panel2);border:1px solid var(--border);border-radius:8px;
+    padding:18px 20px;width:100%;max-width:520px;box-shadow:0 10px 30px rgba(0,0,0,0.5);
+  }
+  #exportBox h3{margin:0 0 4px;font-size:13px;}
+  #exportBox .hint{margin:0 0 10px;}
+  #exportTextarea{
+    width:100%;height:220px;resize:vertical;
+    background:#101115;color:var(--text);border:1px solid var(--border);border-radius:4px;
+    font-family:Consolas,Menlo,monospace;font-size:11.5px;padding:8px;box-sizing:border-box;
+  }
+  #exportBox .btnrow{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="left">
+    <div class="toolbar">
+      <button id="btnAddClick" class="primary" title="Clicar no canvas adiciona pontos">+ Ponto (clique no canvas)</button>
+      <div class="sep"></div>
+      <button id="btnZoomIn">Zoom +</button>
+      <button id="btnZoomOut">Zoom -</button>
+      <button id="btnZoomFit">Ajustar</button>
+      <button id="btnZoomReset">Reset vista</button>
+      <div class="sep"></div>
+      <label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" id="chkSpline"> Suavizar (preview spline)</label>
+      <button id="btnApplySpline" disabled>Aplicar suavização →  pontos</button>
+      <div class="sep"></div>
+      <span class="badge" id="ptCount">0 pontos</span>
+    </div>
+    <div id="canvasWrap">
+      <canvas id="canvas"></canvas>
+    </div>
+    <div id="statusbar">
+      <span id="statusLeft">Clique no canvas para adicionar pontos. Arraste um ponto para o mover. Alt+clique remove. Scroll = zoom. Botão direito / meio arraste = pan.</span>
+      <span id="statusRight"></span>
+    </div>
+  </div>
+
+  <div id="right">
+    <div class="section">
+      <h3>Origem do plano (coordenadas NX)</h3>
+      <div class="hint" style="margin:0 0 8px;">Ponto 3D onde o ponto de referência do desenho 2D é inserido. A coordenada fixa (definida pela face do cubo) usa o respetivo valor aqui em vez de 0.</div>
+      <div class="row tight">
+        <div>
+          <label>Ponto de referência do desenho</label>
+          <select id="originRef" style="width:100%;background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:5px;">
+            <option value="origin">Origem do canvas (0, 0)</option>
+            <option value="le" selected>Leading edge (início, eixo dominante)</option>
+            <option value="te">Trailing edge (fim, eixo dominante)</option>
+          </select>
+        </div>
+      </div>
+      <div class="row tight">
+        <div>
+          <label>Colar coordenadas do NX (XC YC ZC, ou Point( X, Y, Z ))</label>
+          <input type="text" id="originPaste" placeholder="ex: Point( -319.7528, 0.0, 69.7963 )">
+        </div>
+      </div>
+      <div class="row tight">
+        <div>
+          <label class="ax-x">XC</label>
+          <input type="number" id="originX" step="any" value="0">
+        </div>
+        <div>
+          <label class="ax-y">YC</label>
+          <input type="number" id="originY" step="any" value="0">
+        </div>
+        <div>
+          <label class="ax-z">ZC</label>
+          <input type="number" id="originZ" step="any" value="0">
+        </div>
+      </div>
+      <div class="row tight">
+        <button id="btnOriginReset" style="flex:1;">Repor origem (0, 0, 0)</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>Importar / Exportar</h3>
+      <div class="row">
+        <button id="btnImport" style="flex:1;">Importar ficheiro (.csv/.dat/.txt)</button>
+        <input type="file" id="importInput" accept=".csv,.dat,.txt">
+      </div>
+      <div class="row">
+        <div>
+          <label>Nome do ficheiro a exportar</label>
+          <input type="text" id="exportName" value="perfil">
+        </div>
+      </div>
+      <div class="row">
+        <button id="btnExport" class="primary" style="flex:1;">Exportar .dat</button>
+        <button id="btnClear" class="danger">Limpar tudo</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>Escala</h3>
+      <div id="lenPreview">Comprimento atual (eixo dominante): <b id="curLen">0.000</b> mm</div>
+      <div class="row tight">
+        <div>
+          <label>Comprimento alvo (corda total, mm)</label>
+          <input type="number" id="targetLength" step="any" placeholder="ex: 4000">
+        </div>
+      </div>
+      <div class="row tight">
+        <button id="btnScale" style="flex:1;">Aplicar escala (comprimento total)</button>
+      </div>
+      <div class="hint" style="margin:8px 0 6px;">Ou definir escala a partir de uma percentagem: "X% do perfil = comprimento Y"</div>
+      <div class="row tight">
+        <div>
+          <label>Percentagem (%)</label>
+          <input type="number" id="pctValue" step="any" placeholder="ex: 60">
+        </div>
+        <div>
+          <label>= Comprimento (mm)</label>
+          <input type="number" id="pctLength" step="any" placeholder="ex: 4000">
+        </div>
+      </div>
+      <div class="row tight">
+        <button id="btnScalePct" style="flex:1;">Aplicar escala (via percentagem)</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>Corte de perfil</h3>
+      <div class="row tight">
+        <div>
+          <label>Manter (%) a partir de</label>
+          <input type="number" id="cutPct" step="any" placeholder="ex: 60">
+        </div>
+        <div>
+          <label>Referência</label>
+          <select id="cutRef" style="width:100%;background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:5px;">
+            <option value="start">Início (bordo de ataque)</option>
+            <option value="end">Fim (bordo de fuga)</option>
+          </select>
+        </div>
+      </div>
+      <div class="row tight">
+        <button id="btnCut" style="flex:1;">Cortar agora</button>
+      </div>
+      <div class="hint">O corte é aplicado imediatamente sobre os pontos atuais (faz a escala antes ou depois, conforme a ordem em que clicares nos botões).</div>
+    </div>
+
+    <div class="section">
+      <h3>Simplificar pontos</h3>
+      <div class="hint" style="margin:0 0 8px;">Reduz o número de pontos removendo os que pouco contribuem para a forma (algoritmo Douglas-Peucker), dentro de uma tolerância.</div>
+      <div class="row tight">
+        <div>
+          <label>Tolerância (mm) — maior = menos pontos</label>
+          <input type="number" id="simplifyTol" step="any" min="0" value="0.5">
+        </div>
+      </div>
+      <div class="row tight">
+        <button id="btnSimplify" style="flex:1;">Simplificar agora</button>
+      </div>
+    </div>
+
+    <div class="section" id="tableSection">
+      <h3>Pontos
+        <button id="btnAddRow" class="small" style="float:right;margin-left:6px;">+ Adicionar linha</button>
+        <button id="btnClearPoints" class="small danger" style="float:right;">Apagar todos</button>
+      </h3>
+      <div id="tableWrap">
+        <table>
+          <thead><tr><th class="idxcell">#</th><th>X (mm)</th><th>Y (mm)</th><th class="delcell"></th></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="confirmOverlay">
+    <div id="confirmBox">
+      <div id="confirmMsg"></div>
+      <div class="btnrow">
+        <button id="confirmCancel">Cancelar</button>
+        <button id="confirmOk" class="primary">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="exportOverlay">
+    <div id="exportBox">
+      <h3 id="exportTitle">Exportar .dat</h3>
+      <div class="hint" id="exportHint"></div>
+      <textarea id="exportTextarea" readonly spellcheck="false"></textarea>
+      <div class="btnrow">
+        <button id="exportCloseBtn">Fechar</button>
+        <button id="exportDownloadBtn">Descarregar ficheiro</button>
+        <button id="exportCopyBtn" class="primary">Copiar tudo</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="cubeFloating">
+    <h3>Plano de inserção (NX)</h3>
+    <div id="cubeWrap">
+      <div id="cubeStageOuter">
+        <div id="cubeStage">
+          <div id="cube">
+            <div class="face face-x f-posx" data-face="+X">+X</div>
+            <div class="face face-x f-negx" data-face="-X">-X</div>
+            <div class="face face-y f-posy" data-face="+Y">+Y</div>
+            <div class="face face-y f-negy" data-face="-Y">-Y</div>
+            <div class="face face-z f-posz" data-face="+Z">+Z</div>
+            <div class="face face-z f-negz" data-face="-Z">-Z</div>
+          </div>
+        </div>
+      </div>
+      <div id="cubeInfo">
+        <div id="faceLabel">Face selecionada: +Z</div>
+        <div id="mapInfo"></div>
+      </div>
+    </div>
+    <div id="leteRow">
+      <div class="lbl">Orientação do sketch: vetor leading edge &rarr; trailing edge</div>
+      <button id="btnFlipLE" title="Troca o sentido do eixo mapeado a partir do X do canvas">&#8646; Inverter sentido LE &rarr; TE</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+// ---------- Custom confirm (native confirm() gets auto-dismissed in some embedded/preview browsers) ----------
+const confirmOverlay = document.getElementById('confirmOverlay');
+const confirmMsg = document.getElementById('confirmMsg');
+const confirmOk = document.getElementById('confirmOk');
+const confirmCancel = document.getElementById('confirmCancel');
+let confirmResolve = null;
+function showConfirm(message){
+  confirmMsg.textContent = message;
+  confirmOverlay.classList.add('open');
+  return new Promise(resolve=>{ confirmResolve = resolve; });
+}
+function closeConfirm(result){
+  confirmOverlay.classList.remove('open');
+  if(confirmResolve){ confirmResolve(result); confirmResolve = null; }
+}
+confirmOk.addEventListener('click', ()=> closeConfirm(true));
+confirmCancel.addEventListener('click', ()=> closeConfirm(false));
+confirmOverlay.addEventListener('click', (e)=>{ if(e.target===confirmOverlay) closeConfirm(false); });
+
+// ---------- State ----------
+let points = []; // {x,y} in real-world mm
+let selectedIdx = -1;
+let draggingIdx = -1;
+let hoverIdx = -1;
+let selectedFace = "+Z";
+let leTeFlip = 1; // 1 or -1, extra flip applied on top of the face's mapped-X sign
+let planeOrigin = {x:0, y:0, z:0}; // 3D point where canvas (0,0) is inserted
+let splinePreview = false;
+
+// view transform: world(mm) -> screen(px)
+let view = { scale: 2, offX: 0, offY: 0 }; // scale = px per mm
+let isPanning = false, panStart = null, viewStart = null;
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const canvasWrap = document.getElementById('canvasWrap');
+
+// ---------- Face -> mapping rules ----------
+// base positive mapping defines which 3D axes canvasX/canvasY map to when fixed axis is at "+"
+// sign flips on negative faces (mirror) per chosen design.
+const FACE_MAP = {
+  "+Z": {fixed:'z', mapX:'x', mapY:'y', signX:1,  signY:1,  colX:'ax-x', colY:'ax-y'},
+  "-Z": {fixed:'z', mapX:'x', mapY:'y', signX:-1, signY:1,  colX:'ax-x', colY:'ax-y'},
+  "+Y": {fixed:'y', mapX:'x', mapY:'z', signX:1,  signY:1,  colX:'ax-x', colY:'ax-z'},
+  "-Y": {fixed:'y', mapX:'x', mapY:'z', signX:-1, signY:1,  colX:'ax-x', colY:'ax-z'},
+  "+X": {fixed:'x', mapX:'y', mapY:'z', signX:1,  signY:1,  colX:'ax-y', colY:'ax-z'},
+  "-X": {fixed:'x', mapX:'y', mapY:'z', signX:-1, signY:1,  colX:'ax-y', colY:'ax-z'},
+};
+
+function updateFaceUI(){
+  document.querySelectorAll('.face').forEach(f=>f.classList.toggle('selected', f.dataset.face===selectedFace));
+  document.getElementById('faceLabel').textContent = 'Face selecionada: ' + selectedFace;
+  const m = FACE_MAP[selectedFace];
+  const axisName = {x:'X',y:'Y',z:'Z'};
+  const effSignX = m.signX * leTeFlip;
+  const signTxt = s => s<0 ? '(sinal invertido)' : '';
+  document.getElementById('mapInfo').innerHTML =
+    `Coordenada fixa: <span class="ax ax-${m.fixed}">${axisName[m.fixed]} = ${fmtNum(planeOrigin[m.fixed])}</span><br>`+
+    `Canvas X &rarr; <span class="ax ${m.colX}">${axisName[m.mapX]}</span> ${signTxt(effSignX)}<br>`+
+    `Canvas Y &rarr; <span class="ax ${m.colY}">${axisName[m.mapY]}</span> ${signTxt(m.signY)}<br>`+
+    `LE&rarr;TE: ${leTeFlip>0?'sentido do X do canvas':'sentido invertido'}`;
+}
+
+document.getElementById('btnFlipLE').addEventListener('click', ()=>{
+  leTeFlip *= -1;
+  updateFaceUI();
+});
+
+// ---------- Plane origin (XC/YC/ZC) ----------
+const originXEl = document.getElementById('originX');
+const originYEl = document.getElementById('originY');
+const originZEl = document.getElementById('originZ');
+function syncOriginFromInputs(){
+  planeOrigin.x = parseFloat(originXEl.value) || 0;
+  planeOrigin.y = parseFloat(originYEl.value) || 0;
+  planeOrigin.z = parseFloat(originZEl.value) || 0;
+  updateFaceUI();
+}
+[originXEl, originYEl, originZEl].forEach(el=> el.addEventListener('input', syncOriginFromInputs));
+
+document.getElementById('originPaste').addEventListener('input', (e)=>{
+  // Accepts "X  Y  Z" (tab/space/comma separated) or NX's "Point( X, Y, Z )" format.
+  const matches = e.target.value.match(/-?\d+\.?\d*(?:[eE][+-]?\d+)?/g);
+  if(!matches || matches.length<3) return;
+  const nums = matches.slice(0,3).map(parseFloat);
+  if(nums.some(isNaN)) return;
+  originXEl.value = nums[0];
+  originYEl.value = nums[1];
+  originZEl.value = nums[2];
+  syncOriginFromInputs();
+  e.target.value = '';
+});
+
+document.getElementById('btnOriginReset').addEventListener('click', ()=>{
+  originXEl.value = 0; originYEl.value = 0; originZEl.value = 0;
+  syncOriginFromInputs();
+});
+
+document.querySelectorAll('.face').forEach(f=>{
+  f.addEventListener('click', (e)=>{
+    if(cubeDraggedRecently) return;
+    selectedFace = f.dataset.face;
+    updateFaceUI();
+  });
+});
+
+// cube rotation via drag
+const cubeEl = document.getElementById('cube');
+let cubeRotX = -25, cubeRotY = 35;
+let cubeDragging = false, cubeDragStart=null, cubeDraggedRecently=false;
+cubeEl.addEventListener('mousedown', (e)=>{
+  cubeDragging = true; cubeDragStart = {x:e.clientX, y:e.clientY, rx:cubeRotX, ry:cubeRotY};
+  cubeEl.classList.add('dragging');
+  cubeDraggedRecently = false;
+});
+window.addEventListener('mousemove', (e)=>{
+  if(!cubeDragging) return;
+  const dx = e.clientX - cubeDragStart.x, dy = e.clientY - cubeDragStart.y;
+  if(Math.abs(dx)>3||Math.abs(dy)>3) cubeDraggedRecently = true;
+  cubeRotY = cubeDragStart.ry + dx*0.5;
+  cubeRotX = cubeDragStart.rx - dy*0.5;
+  cubeEl.style.transform = `rotateX(${cubeRotX}deg) rotateY(${cubeRotY}deg)`;
+});
+window.addEventListener('mouseup', ()=>{
+  if(cubeDragging){ cubeDragging=false; cubeEl.classList.remove('dragging'); setTimeout(()=>cubeDraggedRecently=false, 50); }
+});
+
+updateFaceUI();
+
+// ---------- Canvas sizing ----------
+function resizeCanvas(){
+  const r = canvasWrap.getBoundingClientRect();
+  canvas.width = r.width * devicePixelRatio;
+  canvas.height = r.height * devicePixelRatio;
+  canvas.style.width = r.width+'px';
+  canvas.style.height = r.height+'px';
+  if(view.offX===0 && view.offY===0){
+    view.offX = r.width/2;
+    view.offY = r.height/2;
+  }
+  draw();
+}
+window.addEventListener('resize', resizeCanvas);
+
+function worldToScreen(x,y){
+  return {
+    x: view.offX + x*view.scale,
+    y: view.offY - y*view.scale
+  };
+}
+function screenToWorld(sx,sy){
+  return {
+    x: (sx - view.offX)/view.scale,
+    y: (view.offY - sy)/view.scale
+  };
+}
+
+// ---------- Drawing ----------
+function draw(){
+  const r = canvasWrap.getBoundingClientRect();
+  ctx.save();
+  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  ctx.clearRect(0,0,r.width,r.height);
+
+  drawGrid(r.width, r.height);
+  drawAxes(r.width, r.height);
+
+  if(splinePreview && points.length>2){
+    drawSpline();
+  }
+
+  drawPolyline();
+  drawPoints();
+
+  ctx.restore();
+}
+
+function niceStep(target){
+  const pow10 = Math.pow(10, Math.floor(Math.log10(target)));
+  const n = target/pow10;
+  let m;
+  if(n<1.5) m=1; else if(n<3.5) m=2; else if(n<7.5) m=5; else m=10;
+  return m*pow10;
+}
+
+function drawGrid(w,h){
+  const targetPx = 70;
+  const stepMM = niceStep(targetPx/view.scale);
+  const stepPx = stepMM*view.scale;
+
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = 'var(--grid)';
+  ctx.strokeStyle = '#33353d';
+
+  const startX = Math.floor((-view.offX)/stepPx)*stepPx + (view.offX % stepPx);
+  ctx.beginPath();
+  for(let x = view.offX % stepPx; x < w; x += stepPx){
+    ctx.moveTo(x,0); ctx.lineTo(x,h);
+  }
+  for(let y = view.offY % stepPx; y < h; y += stepPx){
+    ctx.moveTo(0,y); ctx.lineTo(w,y);
+  }
+  ctx.stroke();
+
+  // labels every step, real mm values
+  ctx.fillStyle = '#5a5d68';
+  ctx.font = '10px Segoe UI';
+  let originScreen = worldToScreen(0,0);
+  let i0 = Math.floor((0-view.offX)/stepPx);
+  for(let x = view.offX % stepPx, k = -Math.round(view.offX/stepPx); x < w+stepPx; x += stepPx, k++){
+    const worldX = (x - view.offX)/view.scale;
+    if(Math.abs(worldX) < stepMM*0.01) continue;
+    ctx.fillText(fmtNum(worldX), x+2, originScreen.y+12>h-4?h-4:(originScreen.y>=0&&originScreen.y<=h?originScreen.y+12:12));
+  }
+  for(let y = view.offY % stepPx; y < h+stepPx; y += stepPx){
+    const worldY = (view.offY - y)/view.scale;
+    if(Math.abs(worldY) < stepMM*0.01) continue;
+    ctx.fillText(fmtNum(worldY), originScreen.x>=0&&originScreen.x<=w?originScreen.x+3:3, y-3);
+  }
+}
+
+function fmtNum(n){
+  if(Math.abs(n) < 0.0005) n = 0;
+  return (Math.round(n*1000)/1000).toString();
+}
+
+function drawAxes(w,h){
+  const o = worldToScreen(0,0);
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = '#e0565688';
+  ctx.beginPath(); ctx.moveTo(0,o.y); ctx.lineTo(w,o.y); ctx.stroke();
+  ctx.strokeStyle = '#38c17288';
+  ctx.beginPath(); ctx.moveTo(o.x,0); ctx.lineTo(o.x,h); ctx.stroke();
+}
+
+function drawPolyline(){
+  if(points.length<2) return;
+  ctx.strokeStyle = '#7fa8ff';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  points.forEach((p,i)=>{
+    const s = worldToScreen(p.x,p.y);
+    if(i===0) ctx.moveTo(s.x,s.y); else ctx.lineTo(s.x,s.y);
+  });
+  ctx.stroke();
+}
+
+function catmullRom(pts, segs){
+  if(pts.length<3) return pts.slice();
+  const out = [];
+  const n = pts.length;
+  for(let i=0;i<n-1;i++){
+    const p0 = pts[i-1] || pts[i];
+    const p1 = pts[i];
+    const p2 = pts[i+1];
+    const p3 = pts[i+2] || p2;
+    for(let t=0;t<segs;t++){
+      const tt = t/segs;
+      const tt2 = tt*tt, tt3=tt2*tt;
+      const x = 0.5*((2*p1.x)+(-p0.x+p2.x)*tt+(2*p0.x-5*p1.x+4*p2.x-p3.x)*tt2+(-p0.x+3*p1.x-3*p2.x+p3.x)*tt3);
+      const y = 0.5*((2*p1.y)+(-p0.y+p2.y)*tt+(2*p0.y-5*p1.y+4*p2.y-p3.y)*tt2+(-p0.y+3*p1.y-3*p2.y+p3.y)*tt3);
+      out.push({x,y});
+    }
+  }
+  out.push(pts[n-1]);
+  return out;
+}
+
+function drawSpline(){
+  const sp = catmullRom(points, 16);
+  ctx.strokeStyle = '#38c172';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  sp.forEach((p,i)=>{
+    const s = worldToScreen(p.x,p.y);
+    if(i===0) ctx.moveTo(s.x,s.y); else ctx.lineTo(s.x,s.y);
+  });
+  ctx.stroke();
+}
+
+function drawPoints(){
+  points.forEach((p,i)=>{
+    const s = worldToScreen(p.x,p.y);
+    const isSel = i===selectedIdx;
+    const isHover = i===hoverIdx && !isSel;
+    ctx.beginPath();
+    ctx.arc(s.x,s.y, isSel?6:(isHover?6:4.5), 0, Math.PI*2);
+    ctx.fillStyle = isSel ? '#ffd166' : (isHover ? '#7fb8ff' : '#4f8cff');
+    ctx.fill();
+    ctx.strokeStyle = isHover ? '#ffffff' : '#12131a';
+    ctx.lineWidth = isHover ? 1.5 : 1;
+    ctx.stroke();
+  });
+}
+
+// ---------- Canvas interaction ----------
+const HIT_RADIUS = 9;
+function findPointAt(sx,sy){
+  for(let i=points.length-1;i>=0;i--){
+    const s = worldToScreen(points[i].x, points[i].y);
+    if(Math.hypot(s.x-sx,s.y-sy) <= HIT_RADIUS) return i;
+  }
+  return -1;
+}
+function findEdgeInsertAt(sx,sy){
+  // find nearest segment within threshold, return insertion index
+  let best = -1, bestDist = 14;
+  for(let i=0;i<points.length-1;i++){
+    const a = worldToScreen(points[i].x, points[i].y);
+    const b = worldToScreen(points[i+1].x, points[i+1].y);
+    const d = distToSegment(sx,sy,a.x,a.y,b.x,b.y);
+    if(d < bestDist){ bestDist = d; best = i+1; }
+  }
+  return best;
+}
+function distToSegment(px,py,ax,ay,bx,by){
+  const dx=bx-ax, dy=by-ay;
+  const len2 = dx*dx+dy*dy;
+  if(len2===0) return Math.hypot(px-ax,py-ay);
+  let t = ((px-ax)*dx+(py-ay)*dy)/len2;
+  t = Math.max(0,Math.min(1,t));
+  const cx = ax+t*dx, cy = ay+t*dy;
+  return Math.hypot(px-cx,py-cy);
+}
+
+let mouseDownInfo = null;
+
+canvas.addEventListener('mousedown', (e)=>{
+  const rect = canvas.getBoundingClientRect();
+  const sx = e.clientX-rect.left, sy = e.clientY-rect.top;
+
+  if(e.button === 1 || e.button === 2){
+    isPanning = true;
+    panStart = {x:e.clientX,y:e.clientY};
+    viewStart = {offX:view.offX, offY:view.offY};
+    return;
+  }
+
+  const hit = findPointAt(sx,sy);
+  if(hit>=0){
+    if(e.altKey){
+      removePoint(hit);
+      return;
+    }
+    draggingIdx = hit;
+    selectedIdx = hit;
+    syncTableSelection();
+    draw();
+    return;
+  }
+
+  // insert on edge if close, else add at end
+  const insertAt = findEdgeInsertAt(sx,sy);
+  const w = screenToWorld(sx,sy);
+  if(insertAt>=0){
+    points.splice(insertAt,0,{x:round4(w.x), y:round4(w.y)});
+    selectedIdx = insertAt;
+  } else {
+    points.push({x:round4(w.x), y:round4(w.y)});
+    selectedIdx = points.length-1;
+  }
+  refreshAll();
+});
+
+canvas.addEventListener('mousemove', (e)=>{
+  const rect = canvas.getBoundingClientRect();
+  const sx = e.clientX-rect.left, sy = e.clientY-rect.top;
+
+  if(isPanning){
+    view.offX = viewStart.offX + (e.clientX-panStart.x);
+    view.offY = viewStart.offY + (e.clientY-panStart.y);
+    draw();
+    return;
+  }
+  if(draggingIdx>=0){
+    canvas.style.cursor = 'grabbing';
+    const w = screenToWorld(sx,sy);
+    points[draggingIdx].x = round4(w.x);
+    points[draggingIdx].y = round4(w.y);
+    refreshAll();
+    return;
+  }
+  const hit = findPointAt(sx,sy);
+  if(hit !== hoverIdx){
+    hoverIdx = hit;
+    canvas.style.cursor = hit>=0 ? 'grab' : 'crosshair';
+    draw();
+  }
+  const w = screenToWorld(sx,sy);
+  document.getElementById('statusRight').textContent = `X: ${fmtNum(w.x)}  Y: ${fmtNum(w.y)}  (mm)`;
+});
+
+canvas.addEventListener('mouseleave', ()=>{
+  if(hoverIdx>=0){ hoverIdx = -1; draw(); }
+});
+
+window.addEventListener('mouseup', ()=>{
+  isPanning = false;
+  if(draggingIdx>=0){
+    draggingIdx = -1;
+    canvas.style.cursor = hoverIdx>=0 ? 'grab' : 'crosshair';
+  }
+});
+
+canvas.addEventListener('contextmenu', (e)=> e.preventDefault());
+
+canvas.addEventListener('wheel', (e)=>{
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const sx = e.clientX-rect.left, sy = e.clientY-rect.top;
+  const before = screenToWorld(sx,sy);
+  const factor = e.deltaY<0 ? 1.12 : 1/1.12;
+  view.scale *= factor;
+  view.scale = Math.max(0.01, Math.min(500, view.scale));
+  const after = worldToScreen(before.x, before.y);
+  view.offX += sx-after.x;
+  view.offY += sy-after.y;
+  draw();
+}, {passive:false});
+
+function round4(n){ return Math.round(n*10000)/10000; }
+
+// ---------- Table ----------
+const tbody = document.getElementById('tbody');
+function renderTable(){
+  tbody.innerHTML = '';
+  points.forEach((p,i)=>{
+    const tr = document.createElement('tr');
+    tr.className = i===selectedIdx ? 'selected' : '';
+    tr.innerHTML = `
+      <td class="idxcell">${i+1}</td>
+      <td><input type="number" step="any" value="${p.x}" data-i="${i}" data-axis="x"></td>
+      <td><input type="number" step="any" value="${p.y}" data-i="${i}" data-axis="y"></td>
+      <td class="delcell"><button class="delbtn" data-i="${i}" title="Remover">&times;</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+  tbody.querySelectorAll('input').forEach(inp=>{
+    inp.addEventListener('input', (e)=>{
+      const i = +e.target.dataset.i, axis = e.target.dataset.axis;
+      const v = parseFloat(e.target.value);
+      if(!isNaN(v)){ points[i][axis] = v; draw(); updateLenPreview(); }
+    });
+    inp.addEventListener('focus', (e)=>{
+      selectedIdx = +e.target.dataset.i;
+      syncTableSelection();
+      draw();
+    });
+  });
+  tbody.querySelectorAll('.delbtn').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      removePoint(+e.target.dataset.i);
+    });
+  });
+}
+function syncTableSelection(){
+  tbody.querySelectorAll('tr').forEach((tr,i)=> tr.classList.toggle('selected', i===selectedIdx));
+}
+
+function removePoint(i){
+  points.splice(i,1);
+  if(selectedIdx===i) selectedIdx=-1;
+  else if(selectedIdx>i) selectedIdx--;
+  refreshAll();
+}
+
+document.getElementById('btnAddRow').addEventListener('click', ()=>{
+  points.push({x:0,y:0});
+  selectedIdx = points.length-1;
+  refreshAll();
+});
+
+function refreshAll(){
+  renderTable();
+  updatePtCount();
+  updateLenPreview();
+  draw();
+}
+
+function updatePtCount(){
+  document.getElementById('ptCount').textContent = points.length + ' pontos';
+}
+
+// ---------- Length / dominant axis ----------
+function getExtent(){
+  if(points.length<2) return {minX:0,maxX:0,minY:0,maxY:0,spanX:0,spanY:0};
+  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+  points.forEach(p=>{
+    if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x;
+    if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y;
+  });
+  return {minX,maxX,minY,maxY,spanX:maxX-minX,spanY:maxY-minY};
+}
+function getDominantAxis(){
+  const ext = getExtent();
+  return ext.spanX >= ext.spanY ? 'x' : 'y';
+}
+function getDominantLength(){
+  const ext = getExtent();
+  return Math.max(ext.spanX, ext.spanY);
+}
+
+function updateLenPreview(){
+  document.getElementById('curLen').textContent = fmtNum(getDominantLength()) + ' (eixo ' + getDominantAxis().toUpperCase() + ')';
+}
+
+// ---------- Scale ----------
+function applyScaleFactor(factor){
+  if(!isFinite(factor) || factor<=0) return;
+  points = points.map(p=>({x: round4(p.x*factor), y: round4(p.y*factor)}));
+  refreshAll();
+}
+
+document.getElementById('btnScale').addEventListener('click', ()=>{
+  const target = parseFloat(document.getElementById('targetLength').value);
+  if(isNaN(target) || target<=0){ alert('Indica um comprimento alvo válido.'); return; }
+  const cur = getDominantLength();
+  if(cur<=0){ alert('É preciso pelo menos 2 pontos com extensão > 0.'); return; }
+  applyScaleFactor(target/cur);
+});
+
+document.getElementById('btnScalePct').addEventListener('click', ()=>{
+  const pct = parseFloat(document.getElementById('pctValue').value);
+  const len = parseFloat(document.getElementById('pctLength').value);
+  if(isNaN(pct) || pct<=0 || pct>100){ alert('Percentagem inválida (0-100).'); return; }
+  if(isNaN(len) || len<=0){ alert('Indica um comprimento válido.'); return; }
+  const impliedTotal = len/(pct/100);
+  const cur = getDominantLength();
+  if(cur<=0){ alert('É preciso pelo menos 2 pontos com extensão > 0.'); return; }
+  applyScaleFactor(impliedTotal/cur);
+});
+
+// ---------- Cut ----------
+document.getElementById('btnCut').addEventListener('click', ()=>{
+  const pct = parseFloat(document.getElementById('cutPct').value);
+  if(isNaN(pct) || pct<=0 || pct>=100){ alert('Percentagem de corte inválida (0-100, exclusivo).'); return; }
+  const ref = document.getElementById('cutRef').value;
+  const axis = getDominantAxis();
+  const ext = getExtent();
+  const span = axis==='x' ? ext.spanX : ext.spanY;
+  if(span<=0){ alert('Sem extensão suficiente para cortar.'); return; }
+  const min = axis==='x' ? ext.minX : ext.minY;
+  const max = axis==='x' ? ext.maxX : ext.maxY;
+  let lo, hi;
+  if(ref==='start'){ lo = min; hi = min + span*(pct/100); }
+  else { hi = max; lo = max - span*(pct/100); }
+  const before = points.length;
+  points = points.filter(p=>{
+    const v = axis==='x' ? p.x : p.y;
+    return v >= lo-1e-9 && v <= hi+1e-9;
+  });
+  if(selectedIdx>=points.length) selectedIdx=-1;
+  refreshAll();
+  document.getElementById('statusLeft').textContent = `Corte aplicado: ${before} → ${points.length} pontos.`;
+});
+
+// ---------- Spline ----------
+document.getElementById('chkSpline').addEventListener('change', (e)=>{
+  splinePreview = e.target.checked;
+  document.getElementById('btnApplySpline').disabled = !splinePreview || points.length<3;
+  draw();
+});
+document.getElementById('btnApplySpline').addEventListener('click', async ()=>{
+  if(points.length<3) return;
+  const ok = await showConfirm('Isto substitui os pontos originais pelos pontos interpolados da spline. Continuar?');
+  if(!ok) return;
+  const sp = catmullRom(points, 12);
+  points = sp.map(p=>({x:round4(p.x), y:round4(p.y)}));
+  splinePreview = false;
+  document.getElementById('chkSpline').checked = false;
+  selectedIdx = -1;
+  refreshAll();
+});
+
+// ---------- Simplify (Douglas-Peucker) ----------
+function perpendicularDistance(pt, a, b){
+  const dx = b.x-a.x, dy = b.y-a.y;
+  const len = Math.hypot(dx,dy);
+  if(len===0) return Math.hypot(pt.x-a.x, pt.y-a.y);
+  return Math.abs(dy*pt.x - dx*pt.y + b.x*a.y - b.y*a.x) / len;
+}
+function douglasPeucker(pts, epsilon){
+  if(pts.length<3) return pts.slice();
+  let dmax = 0, index = 0;
+  const end = pts.length-1;
+  for(let i=1;i<end;i++){
+    const d = perpendicularDistance(pts[i], pts[0], pts[end]);
+    if(d>dmax){ dmax = d; index = i; }
+  }
+  if(dmax>epsilon){
+    const left = douglasPeucker(pts.slice(0,index+1), epsilon);
+    const right = douglasPeucker(pts.slice(index), epsilon);
+    return left.slice(0,-1).concat(right);
+  }
+  return [pts[0], pts[end]];
+}
+document.getElementById('btnSimplify').addEventListener('click', async ()=>{
+  if(points.length<3){ alert('É preciso pelo menos 3 pontos para simplificar.'); return; }
+  const tol = parseFloat(document.getElementById('simplifyTol').value);
+  if(isNaN(tol) || tol<0){ alert('Indica uma tolerância válida (mm, ≥ 0).'); return; }
+  const ok = await showConfirm('Isto substitui os pontos atuais pela versão simplificada. Continuar?');
+  if(!ok) return;
+  const before = points.length;
+  points = douglasPeucker(points, tol);
+  if(selectedIdx>=points.length) selectedIdx = -1;
+  refreshAll();
+  document.getElementById('statusLeft').textContent = `Simplificação aplicada: ${before} → ${points.length} pontos.`;
+});
+
+// ---------- Zoom controls ----------
+document.getElementById('btnZoomIn').addEventListener('click', ()=>{ view.scale*=1.25; draw(); });
+document.getElementById('btnZoomOut').addEventListener('click', ()=>{ view.scale/=1.25; draw(); });
+document.getElementById('btnZoomReset').addEventListener('click', ()=>{
+  const r = canvasWrap.getBoundingClientRect();
+  view.scale = 2; view.offX = r.width/2; view.offY = r.height/2;
+  draw();
+});
+document.getElementById('btnZoomFit').addEventListener('click', fitView);
+function fitView(){
+  if(points.length===0) return;
+  const ext = getExtent();
+  const r = canvasWrap.getBoundingClientRect();
+  const padding = 60;
+  const w = Math.max(ext.spanX, 1e-6), h = Math.max(ext.spanY, 1e-6);
+  const sx = (r.width-padding*2)/w;
+  const sy = (r.height-padding*2)/h;
+  view.scale = Math.min(sx,sy);
+  view.scale = Math.max(0.01, Math.min(500, view.scale));
+  const cx = (ext.minX+ext.maxX)/2, cy=(ext.minY+ext.maxY)/2;
+  view.offX = r.width/2 - cx*view.scale;
+  view.offY = r.height/2 + cy*view.scale;
+  draw();
+}
+
+// ---------- Import ----------
+document.getElementById('btnImport').addEventListener('click', ()=> document.getElementById('importInput').click());
+document.getElementById('importInput').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev)=>{
+    try{
+      const parsed = parsePointsText(ev.target.result);
+      if(parsed.length===0){ alert('Não foram encontrados pontos válidos no ficheiro.'); return; }
+      points = parsed;
+      selectedIdx = -1;
+      refreshAll();
+      fitView();
+      const baseName = file.name.replace(/\.[^./\\]+$/, '');
+      if(baseName) document.getElementById('exportName').value = baseName;
+      document.getElementById('statusLeft').textContent = `Importados ${parsed.length} pontos de "${file.name}".`;
+    }catch(err){
+      alert('Erro ao importar: '+err.message);
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+function parsePointsText(text){
+  const lines = text.split(/\r\n|\r|\n/).map(l=>l.trim()).filter(l=>l.length>0);
+  const result = [];
+  lines.forEach((line, idx)=>{
+    const parts = line.split(/[\s,;]+/).filter(s=>s.length>0);
+    if(parts.length<2) return;
+    const x = parseFloat(parts[0]);
+    const y = parseFloat(parts[1]);
+    if(isNaN(x) || isNaN(y)){
+      if(idx===0) return; // header line, ignore
+      return;
+    }
+    result.push({x:round4(x), y:round4(y)});
+  });
+  return result;
+}
+
+// ---------- Export ----------
+function getReferencePoint(){
+  const ref = document.getElementById('originRef').value;
+  if(ref==='origin' || points.length===0) return {x:0,y:0};
+  const axis = getDominantAxis();
+  let best = points[0];
+  for(const p of points){
+    const v = axis==='x' ? p.x : p.y;
+    const bv = axis==='x' ? best.x : best.y;
+    if(ref==='le' ? v<bv : v>bv) best = p;
+  }
+  return {x:best.x, y:best.y};
+}
+let lastExportText = '';
+let lastExportName = 'perfil.dat';
+
+// The claude.ai Artifact sandbox has no plain-file-download access; it exposes
+// a "downloads" capability instead, which only allows a fixed set of
+// extensions (.dat is not one of them), so the file is offered as .txt there.
+let downloadsCapability = null;
+let downloadsCapabilityChecked = false;
+(async function initDownloadsCapability(){
+  try{
+    if(window.claude && typeof window.claude.use === 'function'){
+      downloadsCapability = await window.claude.use('downloads');
+    }
+  }catch(err){ downloadsCapability = null; }
+  downloadsCapabilityChecked = true;
+})();
+
+async function tryDownload(text, name){
+  if(!downloadsCapabilityChecked){
+    // capability probe still resolving (only relevant on the very first click)
+    await new Promise(r=>{
+      const start = Date.now();
+      (function poll(){
+        if(downloadsCapabilityChecked || Date.now()-start>1500) return r();
+        setTimeout(poll, 50);
+      })();
+    });
+  }
+  if(downloadsCapability){
+    const txtName = name.replace(/\.[^./\\]+$/, '') + '.txt';
+    try{
+      await downloadsCapability.save({filename: txtName, data: text});
+      return {ok:true, mode:'capability', savedName: txtName};
+    }catch(err){
+      return {ok:false, mode:'capability', error: err && err.code};
+    }
+  }
+  try{
+    const blob = new Blob([text], {type:'text/plain'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    return {ok:true, mode:'local', savedName: name};
+  }catch(err){
+    return {ok:false, mode:'local'};
+  }
+}
+
+document.getElementById('btnExport').addEventListener('click', async ()=>{
+  if(points.length===0){ alert('Não há pontos para exportar.'); return; }
+  const m = FACE_MAP[selectedFace];
+  const ref = getReferencePoint();
+  const lines = points.map(p=>{
+    const coords = {x:planeOrigin.x, y:planeOrigin.y, z:planeOrigin.z};
+    coords[m.fixed] = planeOrigin[m.fixed];
+    coords[m.mapX] = planeOrigin[m.mapX] + m.signX * leTeFlip * (p.x - ref.x);
+    coords[m.mapY] = planeOrigin[m.mapY] + m.signY * (p.y - ref.y);
+    return `${coords.x.toFixed(4)} ${coords.y.toFixed(4)} ${coords.z.toFixed(4)}`;
+  });
+  let name = document.getElementById('exportName').value.trim() || 'perfil';
+  if(!/\.dat$/i.test(name)) name += '.dat';
+  lastExportText = lines.join('\n')+'\n';
+  lastExportName = name;
+
+  document.getElementById('exportTitle').textContent = name;
+  document.getElementById('exportHint').textContent = `${points.length} pontos. A preparar o download...`;
+  document.getElementById('exportTextarea').value = lastExportText;
+  document.getElementById('exportOverlay').classList.add('open');
+
+  const result = await tryDownload(lastExportText, lastExportName);
+  document.getElementById('exportHint').textContent = result.ok
+    ? (result.mode==='capability'
+        ? `${points.length} pontos. Ficheiro "${result.savedName}" descarregado — renomeia a extensão de .txt para .dat (o conteúdo já está correto). Se preferires, usa "Copiar tudo" e cola diretamente num ficheiro .dat.`
+        : `${points.length} pontos. O download de "${lastExportName}" deve ter começado.`)
+    : `${points.length} pontos. O download automático não está disponível. Usa "Copiar tudo" e cola o conteúdo num ficheiro .dat.`;
+});
+
+document.getElementById('exportCloseBtn').addEventListener('click', ()=>{
+  document.getElementById('exportOverlay').classList.remove('open');
+});
+document.getElementById('exportOverlay').addEventListener('click', (e)=>{
+  if(e.target.id==='exportOverlay') document.getElementById('exportOverlay').classList.remove('open');
+});
+document.getElementById('exportDownloadBtn').addEventListener('click', async ()=>{
+  const result = await tryDownload(lastExportText, lastExportName);
+  document.getElementById('exportHint').textContent = result.ok
+    ? (result.mode==='capability'
+        ? `Ficheiro "${result.savedName}" descarregado — renomeia a extensão de .txt para .dat.`
+        : `O download de "${lastExportName}" deve ter começado.`)
+    : 'O download automático não está disponível. Usa "Copiar tudo".';
+});
+document.getElementById('exportCopyBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('exportCopyBtn');
+  const ta = document.getElementById('exportTextarea');
+  let ok = false;
+  try{
+    await navigator.clipboard.writeText(lastExportText);
+    ok = true;
+  }catch(err){
+    try{
+      ta.focus(); ta.select();
+      ok = document.execCommand('copy');
+    }catch(err2){ ok = false; }
+  }
+  const original = btn.textContent;
+  btn.textContent = ok ? 'Copiado!' : 'Seleciona e Ctrl+C';
+  if(!ok){ ta.focus(); ta.select(); }
+  setTimeout(()=>{ btn.textContent = original; }, 1500);
+});
+
+async function clearAllPoints(){
+  if(points.length){
+    const ok = await showConfirm('Apagar todos os pontos?');
+    if(!ok) return;
+  }
+  points = [];
+  selectedIdx = -1;
+  refreshAll();
+}
+document.getElementById('btnClear').addEventListener('click', clearAllPoints);
+document.getElementById('btnClearPoints').addEventListener('click', clearAllPoints);
+
+document.getElementById('btnAddClick').addEventListener('click', ()=>{
+  canvasWrap.scrollIntoView();
+});
+
+// ---------- Collapsible sections ----------
+document.querySelectorAll('#right .section').forEach(sec=>{
+  const h3 = sec.querySelector('h3');
+  if(!h3) return;
+  const chevron = document.createElement('span');
+  chevron.className = 'sectionToggle';
+  chevron.textContent = '▾';
+  chevron.title = 'Mostrar/ocultar secção';
+  h3.insertBefore(chevron, h3.firstChild);
+  chevron.addEventListener('click', ()=> sec.classList.toggle('collapsed'));
+});
+
+// ---------- Init ----------
+window.addEventListener('DOMContentLoaded', ()=>{
+  resizeCanvas();
+  refreshAll();
+});
+resizeCanvas();
+refreshAll();
+
+})();
+</script>
+</body>
+</html>
