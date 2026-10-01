@@ -208,6 +208,25 @@
     font-family:Consolas,Menlo,monospace;font-size:11.5px;padding:8px;box-sizing:border-box;
   }
   #exportBox .btnrow{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;}
+  #helpOverlay{
+    position:fixed;inset:0;background:rgba(0,0,0,0.55);
+    display:none;align-items:center;justify-content:center;z-index:200;
+    padding:16px;
+  }
+  #helpOverlay.open{display:flex;}
+  #helpBox{
+    background:var(--panel2);border:1px solid var(--border);border-radius:8px;
+    padding:18px 22px;width:100%;max-width:560px;max-height:85vh;overflow-y:auto;
+    box-shadow:0 10px 30px rgba(0,0,0,0.5);
+  }
+  .helpHeader{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+  .helpHeader h3{margin:0;font-size:14px;}
+  .helpCloseX{background:none;border:none;color:var(--text-dim);font-size:20px;line-height:1;cursor:pointer;padding:0 4px;}
+  .helpCloseX:hover{color:var(--text);}
+  #helpList{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:10px;}
+  #helpList li{font-size:12.5px;line-height:1.6;}
+  #helpList code{background:#101115;border:1px solid var(--border);border-radius:3px;padding:0 4px;font-size:11px;}
+  #helpBox .btnrow{display:flex;justify-content:flex-end;margin-top:16px;}
 </style>
 </head>
 <body>
@@ -225,6 +244,8 @@
       <button id="btnApplySpline" disabled>Aplicar suavização →  pontos</button>
       <div class="sep"></div>
       <span class="badge" id="ptCount">0 pontos</span>
+      <div style="margin-left:auto;"></div>
+      <button id="btnHelp" title="Guia rápido">? Ajuda</button>
     </div>
     <div id="canvasWrap">
       <canvas id="canvas"></canvas>
@@ -388,6 +409,29 @@
         <button id="exportCloseBtn">Fechar</button>
         <button id="exportDownloadBtn">Descarregar ficheiro</button>
         <button id="exportCopyBtn" class="primary">Copiar tudo</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="helpOverlay">
+    <div id="helpBox">
+      <div class="helpHeader">
+        <h3>Guia rápido — Point Plotter</h3>
+        <button id="helpCloseX" class="helpCloseX" title="Fechar">&times;</button>
+      </div>
+      <ol id="helpList">
+        <li><b>Desenhar pontos</b> — clica no canvas (painel esquerdo) para ires adicionando pontos; ligam-se automaticamente por ordem. Arrasta um ponto para o mover. <code>Alt</code>+clique apaga um ponto. Scroll = zoom, botão direito/meio arrastado = pan.</li>
+        <li><b>Importar</b> — em "Importar / Exportar", carrega um ficheiro <code>.csv</code>/<code>.dat</code>/<code>.txt</code> com colunas X Y (espaço, vírgula ou tab). Cabeçalhos não numéricos são ignorados automaticamente.</li>
+        <li><b>Editar a tabela</b> — a tabela "Pontos" (painel direito) está sempre sincronizada com o canvas: edita valores à mão, apaga linhas individuais ou usa "Apagar todos".</li>
+        <li><b>Suavizar</b> — ativa "Suavizar (preview spline)" para pré-visualizar uma curva suave sobre os pontos. "Aplicar suavização" substitui os pontos originais pelos pontos da curva.</li>
+        <li><b>Simplificar</b> — reduz o número de pontos mantendo a forma, ajustando a tolerância (mm).</li>
+        <li><b>Escala e corte</b> — define o comprimento final da corda (mm) e aplica a escala; ou corta o perfil por percentagem a partir do bordo de ataque/fuga.</li>
+        <li><b>Plano de inserção (cubo, canto inferior esquerdo)</b> — clica numa face do cubo para escolher que coordenada 3D fica fixa a 0 e como o canvas mapeia para as outras duas. "Inverter sentido LE → TE" troca a orientação do perfil ao longo desse eixo.</li>
+        <li><b>Origem do plano</b> — cola as coordenadas 3D (do NX, em qualquer formato: "X Y Z" ou "Point( X, Y, Z )") para colocar o leading edge (ou outro ponto de referência) exatamente nesse ponto do espaço.</li>
+        <li><b>Exportar</b> — "Exportar .dat" gera o ficheiro final. Se o download automático não funcionar (ex: ao abrir através de um link partilhado), usa "Copiar tudo" e cola o conteúdo num ficheiro <code>.dat</code> novo.</li>
+      </ol>
+      <div class="btnrow">
+        <button id="helpCloseBtn" class="primary">Entendi</button>
       </div>
     </div>
   </div>
@@ -1239,6 +1283,15 @@ document.getElementById('btnClearPoints').addEventListener('click', clearAllPoin
 document.getElementById('btnAddClick').addEventListener('click', ()=>{
   canvasWrap.scrollIntoView();
 });
+
+// ---------- Help ----------
+const helpOverlay = document.getElementById('helpOverlay');
+function openHelp(){ helpOverlay.classList.add('open'); }
+function closeHelp(){ helpOverlay.classList.remove('open'); }
+document.getElementById('btnHelp').addEventListener('click', openHelp);
+document.getElementById('helpCloseBtn').addEventListener('click', closeHelp);
+document.getElementById('helpCloseX').addEventListener('click', closeHelp);
+helpOverlay.addEventListener('click', (e)=>{ if(e.target===helpOverlay) closeHelp(); });
 
 // ---------- Collapsible sections ----------
 document.querySelectorAll('#right .section').forEach(sec=>{
